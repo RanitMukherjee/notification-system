@@ -9,9 +9,7 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 import jwt
-import os
 
-# Celery will be imported in tasks.py
 
 SECRET_KEY = "alert-secret"
 ALGORITHM = "HS256"
