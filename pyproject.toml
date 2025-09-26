@@ -1,7 +1,14 @@
 [project]
 name = "notification-system"
 version = "0.1.0"
-description = "Add your description here"
+description = "Alerting & Notification Platform"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.110.1",
+    "uvicorn>=0.29.0",
+    "sqlalchemy>=2.0.29",
+    "celery>=5.3.6",
+    "pyjwt>=2.8.0",
+    "python-multipart>=0.0.9"
+]
