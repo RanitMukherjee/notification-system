@@ -34,3 +34,7 @@ uv run celery -A tasks.celery_app beat -s celerybeat-schedule --max-interval=1
 - `alice` (Engineering)
 - `bob` (Marketing)
 - `charlie` (Engineering)
+
+## To-do
+
+- use websockets
