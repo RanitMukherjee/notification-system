@@ -16,7 +16,7 @@ uv run uvicorn app:app --reload
 uv run celery -A tasks.celery_app worker --loglevel=info
 
 # In another terminal: start Celery beat (every 2 hours)
-uv run celery -A tasks.celery_app beat --schedule-file=celerybeat-schedule --max-interval=1
+uv run celery -A tasks.celery_app beat -s celerybeat-schedule --max-interval=1
 ```
 
 > **Note**: For demo, beat interval is 1s. In prod, use `--max-interval=7200`.
