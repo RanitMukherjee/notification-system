@@ -37,4 +37,5 @@ uv run celery -A tasks.celery_app beat -s celerybeat-schedule --max-interval=1
 
 ## To-do
 
-- use websockets
+- use SSE
+- add architecture diagram
