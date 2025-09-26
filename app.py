@@ -180,6 +180,15 @@ def create_alert(alert: AlertCreate, db: Session = Depends(get_db)):
 def list_alerts(db: Session = Depends(get_db)):
     return db.query(Alert).filter(Alert.is_archived == False).all()
 
+@app.delete("/admin/alerts/{alert_id}")
+def delete_alert(alert_id: int, db: Session = Depends(get_db)):
+    alert = db.query(Alert).filter(Alert.id == alert_id, Alert.is_archived == False).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert.is_archived = True  # Soft delete
+    db.commit()
+    return {"status": "deleted"}
+
 # ----------------------------
 # User Routes (JWT auth)
 # ----------------------------
@@ -262,6 +271,11 @@ def dashboard():
     with open("static/index.html") as f:
         return f.read()
 
+@app.get("/user", response_class=HTMLResponse)
+def user_page():
+    with open("static/user.html") as f:
+        return f.read()
+    
 # ----------------------------
 # Seed on first run
 # ----------------------------
