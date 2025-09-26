@@ -1,3 +1,4 @@
+<!-- static/index.html -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -10,39 +11,60 @@
     <h1 class="text-2xl font-bold mb-4">Admin Alert Dashboard</h1>
 
     <!-- Create Alert Form -->
-    <div class="bg-white p-4 rounded mb-6">
+    <div class="bg-white p-4 rounded mb-6 shadow">
       <h2 class="text-lg font-semibold mb-2">Create Alert</h2>
       <input x-model="newAlert.title" placeholder="Title" class="border p-2 w-full mb-2">
       <textarea x-model="newAlert.message" placeholder="Message" class="border p-2 w-full mb-2"></textarea>
-      <select x-model="newAlert.severity" class="border p-2 mb-2">
+      <select x-model="newAlert.severity" class="border p-2 mb-2 w-full">
         <option value="info">Info</option>
         <option value="warning">Warning</option>
         <option value="critical">Critical</option>
       </select>
-      <select x-model="newAlert.audience_type" class="border p-2 mb-2">
+      <select x-model="newAlert.audience_type" class="border p-2 mb-2 w-full">
         <option value="org">Organization</option>
         <option value="team">Team</option>
         <option value="user">User</option>
       </select>
       <input x-show="newAlert.audience_type !== 'org'" x-model="newAlert.audience_ids_str" placeholder="IDs (comma separated)" class="border p-2 w-full mb-2">
-      <button @click="createAlert" class="bg-blue-500 text-white px-4 py-2 rounded">Create</button>
+      <button @click="createAlert" class="bg-blue-500 text-white px-4 py-2 rounded">Create Alert</button>
     </div>
 
     <!-- Alerts List -->
     <div>
       <h2 class="text-lg font-semibold mb-2">Active Alerts</h2>
       <template x-for="alert in alerts" :key="alert.id">
-        <div class="bg-white p-4 mb-3 rounded shadow">
+        <div class="bg-white p-4 mb-3 rounded shadow border-l-4"
+          :class="{
+            'border-blue-500': alert.severity === 'info',
+            'border-yellow-500': alert.severity === 'warning',
+            'border-red-500': alert.severity === 'critical'
+          }">
           <h3 class="font-bold" x-text="alert.title"></h3>
-          <p x-text="alert.message"></p>
-          <span :class="{
-            'text-blue-600': alert.severity === 'info',
-            'text-yellow-600': alert.severity === 'warning',
-            'text-red-600': alert.severity === 'critical'
-          }" x-text="alert.severity"></span>
-          <span class="ml-2 text-sm text-gray-500" x-text="`Audience: ${alert.audience_type}`"></span>
+          <p x-text="alert.message" class="mb-2"></p>
+          <div class="flex items-center text-sm text-gray-600 mb-2">
+            <span :class="{
+              'text-blue-600': alert.severity === 'info',
+              'text-yellow-600': alert.severity === 'warning',
+              'text-red-600': alert.severity === 'critical'
+            }" x-text="alert.severity"></span>
+            <span class="mx-2">•</span>
+            <span>Audience: <b x-text="alert.audience_type"></b></span>
+            <span class="mx-2">•</span>
+            <span>Sent to <b x-text="alert.total_users"></b> users</span>
+          </div>
+          <div class="text-xs text-gray-500 mb-2">
+            📤 Delivered: <b x-text="alert.delivered"></b> |
+            👁️ Read: <b x-text="alert.read"></b> |
+            ⏸️ Snoozed: <b x-text="alert.snoozed"></b>
+          </div>
+          <button 
+            @click="deleteAlert(alert.id)" 
+            class="text-red-500 hover:underline text-sm">
+            Delete Alert
+          </button>
         </div>
       </template>
+      <div x-show="alerts.length === 0" class="text-gray-500">No active alerts.</div>
     </div>
   </div>
 
@@ -57,22 +79,46 @@
           audience_type: 'org',
           audience_ids_str: ''
         },
+
         async loadAlerts() {
-          const res = await fetch('/admin/alerts');
-          this.alerts = await res.json();
+          try {
+            const res = await fetch('/admin/alerts');
+            this.alerts = await res.json();
+          } catch (e) {
+            console.error(e);
+            alert('Failed to load alerts');
+          }
         },
+
         async createAlert() {
           const payload = { ...this.newAlert };
           if (payload.audience_ids_str) {
-            payload.audience_ids = payload.audience_ids_str.split(',').map(id => parseInt(id.trim()));
+            payload.audience_ids = payload.audience_ids_str
+              .split(',')
+              .map(id => parseInt(id.trim()))
+              .filter(id => !isNaN(id));
           }
-          await fetch('/admin/alerts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          this.newAlert = { title: '', message: '', severity: 'info', audience_type: 'org', audience_ids_str: '' };
-          this.loadAlerts();
+          try {
+            await fetch('/admin/alerts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            this.newAlert = { title: '', message: '', severity: 'info', audience_type: 'org', audience_ids_str: '' };
+            this.loadAlerts();
+          } catch (e) {
+            alert('Failed to create alert');
+          }
+        },
+
+        async deleteAlert(id) {
+          if (!confirm('Are you sure you want to delete this alert?')) return;
+          try {
+            await fetch(`/admin/alerts/${id}`, { method: 'DELETE' });
+            this.loadAlerts();
+          } catch (e) {
+            alert('Failed to delete alert');
+          }
         }
       }
     }
