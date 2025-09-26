@@ -1,123 +1,166 @@
-<!-- static/user.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Your Alerts</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <meta charset="UTF-8">
+    <title>Your Alerts</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="p-6 bg-gray-50">
-  <div x-data="userApp()" x-init="getTokenFromStorage(); setTimeout(loadAlerts, 300)">
+
+<div x-data="userApp()" x-init="getTokenFromStorage(); if(token) { setTimeout(() => loadAlerts(), 100); }">
+
+    <!-- Display User and Logout Button -->
+    <div x-show="token" class="flex justify-between items-center mb-4">
+        <p class="text-gray-700">Welcome, <strong x-text="username" class="font-bold"></strong>!</p>
+        <button @click="logout()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 shadow">
+            Logout
+        </button>
+    </div>
+
     <h1 class="text-2xl font-bold mb-4">Your Alerts</h1>
 
     <!-- Token Input -->
     <div x-show="!token" class="mb-6 bg-white p-4 rounded shadow">
-      <p class="mb-2">Enter your username to log in (e.g., <code>alice</code>, <code>bob</code>, <code>charlie</code>):</p>
-      <input x-model="username" @keyup.enter="getToken" placeholder="Username" class="border p-2 mr-2">
-      <button @click="getToken" class="bg-green-500 text-white px-3 py-1 rounded">Get Token</button>
+        <p class="mb-2">Enter your username to log in (e.g., <code>alice</code>, <code>bob</code>, <code>charlie</code>)</p>
+        <input x-model="inputUsername" @keyup.enter="getToken()" placeholder="Username" class="border p-2 mr-2 rounded">
+        <button @click="getToken()" class="bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600">Get Token</button>
     </div>
 
     <!-- Alerts -->
-    <div x-show="loading" class="text-gray-500">Loading alerts...</div>
+    <div x-show="token">
+        <div x-show="loading" class="text-gray-500">Loading alerts...</div>
+        
+        <template x-for="item in alerts" :key="item.alert.id">
+            <div class="bg-white p-4 mb-3 rounded shadow border-l-4" :class="{
+                'border-blue-500': item.alert.severity === 'info',
+                'border-yellow-500': item.alert.severity === 'warning',
+                'border-red-500': item.alert.severity === 'critical'
+            }">
+                <h3 class="font-bold" x-text="item.alert.title"></h3>
+                <p x-text="item.alert.message" class="mb-2"></p>
+                
+                <div class="text-sm text-gray-600 mb-2">
+                    <span class="font-semibold capitalize" :class="{
+                        'text-blue-600': item.alert.severity === 'info',
+                        'text-yellow-600': item.alert.severity === 'warning',
+                        'text-red-600': item.alert.severity === 'critical'
+                    }" x-text="item.alert.severity"></span>
+                    <span class="mx-2">|</span>
+                    <span x-text="new Date(item.alert.starttime).toLocaleString()"></span>
+                    <template x-if="item.snoozed_until">
+                        <span class="ml-2 text-yellow-700 font-semibold">(Snoozed until <span x-text="new Date(item.snoozed_until).toLocaleTimeString()"></span>)</span>
+                    </template>
+                </div>
 
-    <template x-for="item in alerts" :key="item.alert.id">
-      <div class="bg-white p-4 mb-3 rounded shadow border-l-4"
-        :class="{
-          'border-blue-500': item.alert.severity === 'info',
-          'border-yellow-500': item.alert.severity === 'warning',
-          'border-red-500': item.alert.severity === 'critical'
-        }">
-        <h3 class="font-bold" x-text="item.alert.title"></h3>
-        <p x-text="item.alert.message" class="mb-2"></p>
-        <div class="text-sm text-gray-600 mb-2">
-          <span :class="{
-            'text-blue-600': item.alert.severity === 'info',
-            'text-yellow-600': item.alert.severity === 'warning',
-            'text-red-600': item.alert.severity === 'critical'
-          }" x-text="item.alert.severity"></span>
-          • <span x-text="new Date(item.alert.start_time).toLocaleString()"></span>
-          <span x-show="item.snoozed_until"> • Snoozed until <span x-text="new Date(item.snoozed_until).toLocaleTimeString()"></span></span>
-        </div>
-        <div>
-          <button 
-            @click="markRead(item.alert.id, true)" 
-            :disabled="item.is_read"
-            class="text-sm bg-gray-200 px-2 py-1 rounded mr-2"
-            x-text="item.is_read ? '✅ Read' : 'Mark Read'">
-          </button>
-          <button 
-            @click="snooze(item.alert.id)"
-            class="text-sm bg-yellow-200 px-2 py-1 rounded">
-            ⏸️ Snooze (until EOD)
-          </button>
-        </div>
-      </div>
-    </template>
+                <div>
+                    <button @click="markRead(item.alert.id, true)" :disabled="item.is_read"
+                            class="text-sm px-2 py-1 rounded mr-2"
+                            :class="item.is_read ? 'bg-gray-300 text-gray-500' : 'bg-green-200 hover:bg-green-300'">
+                        <span x-text="item.is_read ? 'Read' : 'Mark as Read'"></span>
+                    </button>
+                    <button @click="snooze(item.alert.id)" class="text-sm bg-yellow-200 px-2 py-1 rounded hover:bg-yellow-300">
+                        Snooze until EOD
+                    </button>
+                </div>
+            </div>
+        </template>
 
-    <div x-show="alerts.length === 0 && !loading && token" class="text-gray-500">
-      You have no active alerts.
+        <div x-show="alerts.length === 0 && !loading && token" class="text-gray-500">
+            You have no active alerts.
+        </div>
     </div>
-  </div>
 
-  <script>
-    function userApp() {
-      return {
-        token: '',
+</div>
+
+<script>
+function userApp() {
+    return {
+        token: null,
+        inputUsername: '', // Renamed to avoid conflict
         username: '',
         alerts: [],
         loading: false,
-
+        
         getTokenFromStorage() {
-          this.token = localStorage.getItem('user_token') || '';
+            this.token = localStorage.getItem('userToken');
+            if (this.token) {
+                this.parseToken();
+            }
         },
 
+        parseToken() {
+            if (!this.token) return;
+            try {
+                const payload = JSON.parse(atob(this.token.split('.')[1]));
+                this.username = payload.sub;
+            } catch (e) {
+                console.error("Invalid token found, logging out.", e);
+                this.logout();
+            }
+        },
+        
         async getToken() {
-          if (!this.username.trim()) return;
-          try {
-            const res = await fetch(`/token/${this.username}`);
-            const data = await res.json();
-            this.token = data.token;
-            localStorage.setItem('user_token', this.token);
-            this.loadAlerts();
-          } catch (e) {
-            alert('User not found. Try alice, bob, or charlie.');
-          }
+            if (!this.inputUsername.trim()) return;
+            try {
+                const res = await fetch(`/token/${this.inputUsername}`);
+                if (!res.ok) throw new Error('User not found');
+                const data = await res.json();
+                this.token = data.token;
+                localStorage.setItem('userToken', this.token);
+                this.parseToken();
+                this.loadAlerts();
+            } catch (e) {
+                alert("User not found. Try 'alice', 'bob', or 'charlie'.");
+            }
         },
 
+        logout() {
+            this.token = null;
+            this.username = '';
+            this.inputUsername = '';
+            this.alerts = [];
+            localStorage.removeItem('userToken');
+        },
+        
         async loadAlerts() {
-          if (!this.token) return;
-          this.loading = true;
-          try {
-            const res = await fetch('/user/alerts', {
-              headers: { 'Authorization': `Bearer ${this.token}` }
-            });
-            this.alerts = await res.json();
-          } catch (e) {
-            console.error(e);
-            alert('Failed to load your alerts. Token may be invalid.');
-            this.token = '';
-            localStorage.removeItem('user_token');
-          }
-          this.loading = false;
+            if (!this.token) return;
+            this.loading = true;
+            try {
+                const res = await fetch('/user/alerts', {
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+                if (res.status === 401) {
+                    throw new Error("Token is invalid or expired.");
+                }
+                this.alerts = await res.json();
+            } catch (e) {
+                console.error(e);
+                alert("Failed to load your alerts. Your session may have expired. Please log in again.");
+                this.logout();
+            } finally {
+                this.loading = false;
+            }
         },
-
+        
         async markRead(alertId, read = true) {
-          await fetch(`/user/alerts/${alertId}/read?read=${read}`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${this.token}` }
-          });
-          this.loadAlerts();
+            await fetch(`/user/alerts/${alertId}/read?read=${read}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            this.loadAlerts();
         },
-
+        
         async snooze(alertId) {
-          await fetch(`/user/alerts/${alertId}/snooze`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${this.token}` }
-          });
-          this.loadAlerts();
+            await fetch(`/user/alerts/${alertId}/snooze`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            this.loadAlerts();
         }
-      }
     }
-  </script>
+}
+</script>
+
 </body>
 </html>
