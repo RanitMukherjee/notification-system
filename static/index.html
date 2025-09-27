@@ -7,8 +7,24 @@
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="p-6 bg-gray-50">
-  <div x-data="alertApp()" x-init="loadAlerts(); setInterval(loadAlerts, 30000)">
+  <div x-data="alertApp()" x-init="loadAlerts(); loadAnalytics(); setInterval(() => { loadAlerts(); loadAnalytics(); }, 30000)">
     <h1 class="text-2xl font-bold mb-4">Admin Alert Dashboard</h1>
+
+    <!-- Global Analytics -->
+    <div class="bg-white p-4 rounded mb-6 shadow">
+      <h2 class="text-lg font-semibold mb-2">Analytics Overview</h2>
+      <div class="text-sm text-gray-600">
+        <span>📊 Total Alerts: <b x-text="analytics.total_alerts || '0'"></b></span> |
+        <span>📤 Delivered: <b x-text="analytics.delivered || '0'"></b></span> |
+        <span>👁️ Read: <b x-text="analytics.read || '0'"></b></span> |
+        <span>⏸️ Snoozed: <b x-text="analytics.snoozed || '0'"></b></span>
+      </div>
+      <div class="text-sm text-gray-600 mt-2">
+        <span>By Severity: Info <b x-text="analytics.by_severity?.info || '0'"></b> |
+        Warning <b x-text="analytics.by_severity?.warning || '0'"></b> |
+        Critical <b x-text="analytics.by_severity?.critical || '0'"></b></span>
+      </div>
+    </div>
 
     <!-- Create Alert Form -->
     <div class="bg-white p-4 rounded mb-6 shadow">
@@ -26,6 +42,7 @@
         <option value="user">User</option>
       </select>
       <input x-show="newAlert.audience_type !== 'org'" x-model="newAlert.audience_ids_str" placeholder="IDs (comma separated)" class="border p-2 w-full mb-2">
+      <input x-model="newAlert.expiry_time" type="datetime-local" placeholder="Expiry Time (optional)" class="border p-2 w-full mb-2">
       <button @click="createAlert" class="bg-blue-500 text-white px-4 py-2 rounded">Create Alert</button>
     </div>
 
@@ -42,7 +59,7 @@
           <h3 class="font-bold" x-text="alert.title"></h3>
           <p x-text="alert.message" class="mb-2"></p>
           <div class="flex items-center text-sm text-gray-600 mb-2">
-            <span :class="{
+            <span class="font-semibold capitalize" :class="{
               'text-blue-600': alert.severity === 'info',
               'text-yellow-600': alert.severity === 'warning',
               'text-red-600': alert.severity === 'critical'
@@ -50,12 +67,12 @@
             <span class="mx-2">•</span>
             <span>Audience: <b x-text="alert.audience_type"></b></span>
             <span class="mx-2">•</span>
-            <span>Sent to <b x-text="alert.total_users"></b> users</span>
-          </div>
-          <div class="text-xs text-gray-500 mb-2">
-            📤 Delivered: <b x-text="alert.delivered"></b> |
-            👁️ Read: <b x-text="alert.read"></b> |
-            ⏸️ Snoozed: <b x-text="alert.snoozed"></b>
+            <span>Sent to <b x-text="getAudienceCount(alert)"></b> users</span>
+            <span class="mx-2">•</span>
+            <span>Starts: <b x-text="new Date(alert.start_time).toLocaleString()"></b></span>
+            <template x-if="alert.expiry_time">
+              <span class="mx-2">• Expires: <b x-text="new Date(alert.expiry_time).toLocaleString()"></b></span>
+            </template>
           </div>
           <button 
             @click="deleteAlert(alert.id)" 
@@ -72,21 +89,34 @@
     function alertApp() {
       return {
         alerts: [],
+        analytics: {},
         newAlert: {
           title: '',
           message: '',
           severity: 'info',
           audience_type: 'org',
-          audience_ids_str: ''
+          audience_ids_str: '',
+          expiry_time: ''
         },
 
         async loadAlerts() {
           try {
             const res = await fetch('/admin/alerts');
+            if (!res.ok) throw new Error('Failed to load');
             this.alerts = await res.json();
           } catch (e) {
             console.error(e);
             alert('Failed to load alerts');
+          }
+        },
+
+        async loadAnalytics() {
+          try {
+            const res = await fetch('/analytics');
+            if (!res.ok) throw new Error('Failed to load');
+            this.analytics = await res.json();
+          } catch (e) {
+            console.error(e);
           }
         },
 
@@ -98,14 +128,22 @@
               .map(id => parseInt(id.trim()))
               .filter(id => !isNaN(id));
           }
+          if (payload.expiry_time) {
+            payload.expiry_time = new Date(payload.expiry_time).toISOString();
+          } else {
+            delete payload.expiry_time;
+          }
+          delete payload.audience_ids_str;
           try {
-            await fetch('/admin/alerts', {
+            const res = await fetch('/admin/alerts', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload)
             });
-            this.newAlert = { title: '', message: '', severity: 'info', audience_type: 'org', audience_ids_str: '' };
+            if (!res.ok) throw new Error('Failed to create');
+            this.newAlert = { title: '', message: '', severity: 'info', audience_type: 'org', audience_ids_str: '', expiry_time: '' };
             this.loadAlerts();
+            this.loadAnalytics();
           } catch (e) {
             alert('Failed to create alert');
           }
@@ -114,11 +152,18 @@
         async deleteAlert(id) {
           if (!confirm('Are you sure you want to delete this alert?')) return;
           try {
-            await fetch(`/admin/alerts/${id}`, { method: 'DELETE' });
+            const res = await fetch(`/admin/alerts/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete');
             this.loadAlerts();
+            this.loadAnalytics();
           } catch (e) {
             alert('Failed to delete alert');
           }
+        },
+
+        getAudienceCount(alert) {
+          if (alert.audience_type === 'org') return 'All';
+          return alert.audience_ids ? alert.audience_ids.length : '0';
         }
       }
     }

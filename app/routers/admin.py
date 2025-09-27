@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
+from datetime import datetime, timezone
 from ..dependencies import get_db
 from ..models import Alert
 from ..schemas import AlertCreate, AlertOut
