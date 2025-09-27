@@ -8,11 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text, JSON, ForeignKey, Enum as SQLEnum, or_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-import jwt
 
-
-SECRET_KEY = "alert-secret"
-ALGORITHM = "HS256"
 DATABASE_URL = "sqlite:///alerts.db"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
@@ -96,7 +92,6 @@ class SnoozeRequest(BaseModel):
     pass  # Placeholder if needed
 
 # Dependency
-
 def get_db():
     db = SessionLocal()
     try:
@@ -104,29 +99,20 @@ def get_db():
     finally:
         db.close()
 
-# User Authentication
-
+# User Authentication (Simplified: Bearer token is just the username)
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     token = request.headers.get("Authorization")
     if not token:
         raise HTTPException(status_code=401, detail="No token provided")
     if not token.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid token format")
-    token = token.replace("Bearer ", "")
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        if not username:
-            raise HTTPException(status_code=401, detail="Invalid token payload")
-        user = db.query(User).filter(User.name == username).first()
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-        return user
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    username = token.replace("Bearer ", "")
+    user = db.query(User).filter(User.name == username).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
 
 # Helper functions
-
 def get_relevant_users(db: Session, alert: Alert) -> List[User]:
     if alert.audience_type == AudienceType.ORG:
         return db.query(User).all()
@@ -142,7 +128,6 @@ def get_relevant_users(db: Session, alert: Alert) -> List[User]:
             return []
     return []
 
-
 def should_send_reminder(db: Session, user_id: int, alert: Alert) -> bool:
     now = datetime.now(timezone.utc)
     if alert.expiry_time and now > alert.expiry_time:
@@ -157,14 +142,12 @@ def should_send_reminder(db: Session, user_id: int, alert: Alert) -> bool:
         return True
     return False
 
-
 def send_in_app_alert(db: Session, user_id: int, alert_id: int):
     delivery = NotificationDelivery(user_id=user_id, alert_id=alert_id, sent_at=datetime.now(timezone.utc))
     db.add(delivery)
     # Commit will be done by caller
 
 # Routes
-
 @app.post("/admin/alerts", response_model=AlertOut)
 def create_alert(alert_create: AlertCreate, db: Session = Depends(get_db)):
     alert = Alert(
@@ -190,11 +173,9 @@ def create_alert(alert_create: AlertCreate, db: Session = Depends(get_db)):
 
     return alert
 
-
 @app.get("/admin/alerts", response_model=List[AlertOut])
 def list_alerts(db: Session = Depends(get_db)):
     return db.query(Alert).filter(Alert.is_archived == False).all()
-
 
 @app.delete("/admin/alerts/{alert_id}")
 def delete_alert(alert_id: int, db: Session = Depends(get_db)):
@@ -204,7 +185,6 @@ def delete_alert(alert_id: int, db: Session = Depends(get_db)):
     alert.is_archived = True
     db.commit()
     return {"status": "deleted"}
-
 
 @app.get("/user/alerts")
 def get_user_alerts(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -226,7 +206,6 @@ def get_user_alerts(current_user: User = Depends(get_current_user), db: Session 
             })
     return alerts
 
-
 @app.post("/user/alerts/{alert_id}/snooze")
 def snooze_alert(alert_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
@@ -239,7 +218,6 @@ def snooze_alert(alert_id: int, current_user: User = Depends(get_current_user), 
     db.commit()
     return {"status": "snoozed"}
 
-
 @app.post("/user/alerts/{alert_id}/read")
 def mark_read(alert_id: int, read: bool = True, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     pref = db.query(UserAlertPreference).filter_by(user_id=current_user.id, alert_id=alert_id).first()
@@ -249,7 +227,6 @@ def mark_read(alert_id: int, read: bool = True, current_user: User = Depends(get
     pref.is_read = read
     db.commit()
     return {"status": "updated"}
-
 
 @app.get("/analytics")
 def analytics(db: Session = Depends(get_db)):
@@ -266,27 +243,15 @@ def analytics(db: Session = Depends(get_db)):
         "by_severity": by_severity
     }
 
-
-@app.get("/token/{username}")
-def get_token(username: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.name == username).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    token = jwt.encode({"sub": username}, SECRET_KEY, algorithm=ALGORITHM)
-    return {"token": token}
-
-
 @app.get("/", response_class=HTMLResponse)
 def dashboard():
     with open("static/index.html") as f:
         return f.read()
 
-
 @app.get("/user", response_class=HTMLResponse)
 def user_page():
     with open("static/user.html") as f:
         return f.read()
-
 
 def seed_data(db: Session):
     if db.query(User).count() == 0:
