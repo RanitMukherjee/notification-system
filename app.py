@@ -101,15 +101,18 @@ def get_db():
 
 # User Authentication (Simplified: Bearer token is just the username)
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
-    token = request.headers.get("Authorization")
-    if not token:
-        raise HTTPException(status_code=401, detail="No token provided")
-    if not token.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid token format")
-    username = token.replace("Bearer ", "")
+    auth = request.headers.get("Authorization")
+    if not auth or not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or missing authorization header")
+    
+    username = auth.removeprefix("Bearer ").strip()
+    if not username:
+        raise HTTPException(status_code=401, detail="Username missing in token")
+    
     user = db.query(User).filter(User.name == username).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    
     return user
 
 # Helper functions
