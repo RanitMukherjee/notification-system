@@ -39,3 +39,4 @@ uv run celery -A tasks.celery_app beat -s celerybeat-schedule --max-interval=1
 
 - use SSE
 - add architecture diagram
+- streamline the expiry logic
